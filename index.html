@@ -37,10 +37,15 @@
   .seg { display: flex; background: var(--panel); border-radius: var(--radius); padding: 4px; gap: 4px; }
   .seg button { flex: 1; padding: 12px 4px; background: transparent; border-radius: 10px; font-weight: 600; }
   .seg button.on { background: var(--accent); color: #111; }
+  #pick { overflow-y: auto; }
+  .pick-title { text-align: center; font-size: 22px; font-weight: 700; margin: 4px 0; }
+  .pick-title .n { color: var(--accent); }
+  .zoo button.on { outline: 3px solid var(--accent); }
   .slots { display: flex; gap: 8px; }
   .slot { flex: 1; background: var(--panel); border-radius: var(--radius); padding: 8px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 2px dashed #3a4150; min-height: 76px; justify-content: center; }
   .slot.has { border-style: solid; border-color: var(--accent); }
   .slot .em { font-size: 34px; line-height: 1; }
+  .slot.now { border-color: var(--accent); background: #2a2415; }
   .slot .nm { font-size: 12px; color: var(--muted); }
   .slot.has .nm { color: var(--text); }
   .zoo { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
@@ -131,14 +136,22 @@
   <div class="seg" id="countSeg">
     <button data-v="2" class="on">2 人</button><button data-v="3">3 人</button><button data-v="4">4 人</button>
   </div>
-  <div class="label">選擇你的動物（依序點選）</div>
-  <div class="slots" id="slots"></div>
-  <div class="zoo" id="zoo"></div>
   <div class="toggle" style="margin-top:6px">
     <div><div>Double Out</div><div class="label" style="margin:2px 0 0">最後一鏢必須是雙倍區或紅心</div></div>
     <button class="sw" id="doSw"></button>
   </div>
   <button class="primary" id="startBtn">開始遊戲</button>
+</section>
+
+<!-- 選動物畫面 -->
+<section id="pick" class="screen">
+  <div class="topbar">
+    <button class="ghost" id="pickBack">‹ 返回</button>
+    <span id="pickStep"></span>
+  </div>
+  <div class="pick-title"><span class="n" id="pickWho"></span> 請選你的動物</div>
+  <div class="slots" id="slots"></div>
+  <div class="zoo" id="zoo"></div>
 </section>
 
 <!-- 遊戲畫面 -->
@@ -212,47 +225,60 @@ function segSet(id, v) { $(id).querySelectorAll('button').forEach(b => b.classLi
 const ZOO = [['🐶','小狗'],['🐱','小貓'],['🐰','兔子'],['🦊','狐狸'],['🐻','棕熊'],['🐼','貓熊'],['🐨','無尾熊'],['🐯','老虎'],['🦁','獅子'],['🐮','乳牛'],
   ['🐷','小豬'],['🐸','青蛙'],['🐵','猴子'],['🐔','公雞'],['🐧','企鵝'],['🦉','貓頭鷹'],['🐙','章魚'],['🦄','獨角獸'],['🐲','神龍'],['🦖','恐龍']];
 const zooName = em => (ZOO.find(z => z[0] === em) || ['', ''])[1];
-function renderNames() {
-  settings.animals = settings.animals.filter(a => zooName(a)).slice(0, settings.count);
+let picks = [];
+function renderPick() {
+  const i = picks.length;
+  $('#pickWho').textContent = `玩家 ${i + 1}`;
+  $('#pickStep').textContent = `${i + 1} / ${settings.count}`;
   const slots = $('#slots'); slots.innerHTML = '';
-  for (let i = 0; i < settings.count; i++) {
-    const a = settings.animals[i], d = document.createElement('div');
-    d.className = 'slot' + (a ? ' has' : '');
-    d.innerHTML = a ? `<div class="em">${a}</div><div class="nm">${zooName(a)}</div>` : `<div class="em" style="color:#3a4150">?</div><div class="nm">玩家 ${i + 1}</div>`;
-    if (a) d.addEventListener('click', () => { settings.animals.splice(i, 1); click(); save(); renderNames(); });
+  for (let k = 0; k < settings.count; k++) {
+    const a = picks[k], d = document.createElement('div');
+    d.className = 'slot' + (a ? ' has' : '') + (k === i ? ' now' : '');
+    d.innerHTML = a ? `<div class="em">${a}</div><div class="nm">${zooName(a)}</div>` : `<div class="em" style="color:#3a4150">?</div><div class="nm">玩家 ${k + 1}</div>`;
     slots.appendChild(d);
   }
   const zoo = $('#zoo'); zoo.innerHTML = '';
   ZOO.forEach(([em, nm]) => {
-    const b = document.createElement('button'); b.className = settings.animals.includes(em) ? 'taken' : '';
+    const b = document.createElement('button'); b.className = picks.includes(em) ? 'taken' : '';
     b.innerHTML = `<span class="em">${em}</span><span class="nm">${nm}</span>`;
     b.addEventListener('click', () => {
-      if (settings.animals.includes(em) || settings.animals.length >= settings.count) return;
-      settings.animals.push(em); click(); save(); renderNames();
+      if (picks.includes(em)) return;
+      picks.push(em); click();
+      if (picks.length >= settings.count) startGame(); else renderPick();
     });
     zoo.appendChild(b);
   });
-  $('#startBtn').disabled = settings.animals.length < settings.count;
 }
-segInit('#startSeg', 'start', v => { settings.start = +v; save(); });
-segInit('#countSeg', 'count', v => { settings.count = +v; renderNames(); save(); });
-$('#doSw').addEventListener('click', () => { settings.doubleOut = !settings.doubleOut; $('#doSw').classList.toggle('on', settings.doubleOut); save(); });
-$('#startBtn').addEventListener('click', () => {
+function showPick() {
+  picks = [];
+  $('#setup').classList.remove('active'); $('#pick').classList.add('active'); renderPick();
+  $('#pick').scrollTop = 0;
+}
+$('#pickBack').addEventListener('click', () => {
+  if (picks.length) { picks.pop(); click(); renderPick(); }
+  else { $('#pick').classList.remove('active'); showSetup(); }
+});
+function startGame() {
+  settings.animals = picks.slice(); save();
   game = {
-    players: settings.animals.map(a => ({ em: a, name: zooName(a), score: settings.start })),
+    players: picks.map(a => ({ em: a, name: zooName(a), score: settings.start })),
     cur: 0, turnStart: settings.start, darts: [], over: false, history: []
   };
   save(); showGame();
-});
+}
+segInit('#startSeg', 'start', v => { settings.start = +v; save(); });
+segInit('#countSeg', 'count', v => { settings.count = +v; save(); });
+$('#doSw').addEventListener('click', () => { settings.doubleOut = !settings.doubleOut; $('#doSw').classList.toggle('on', settings.doubleOut); save(); });
+$('#startBtn').addEventListener('click', () => { click(); showPick(); });
 
 // ---------- 遊戲 ----------
 function showSetup() {
   segSet('#startSeg', settings.start); segSet('#countSeg', settings.count);
-  $('#doSw').classList.toggle('on', settings.doubleOut); renderNames();
-  $('#setup').classList.add('active'); $('#game').classList.remove('active');
+  $('#doSw').classList.toggle('on', settings.doubleOut);
+  $('#setup').classList.add('active'); $('#pick').classList.remove('active'); $('#game').classList.remove('active');
 }
 function showGame() {
-  $('#setup').classList.remove('active'); $('#game').classList.add('active');
+  $('#setup').classList.remove('active'); $('#pick').classList.remove('active'); $('#game').classList.add('active');
   mult = 1; pending = null; setMode(settings.mode); render();
 }
 function render() {
