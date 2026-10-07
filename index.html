@@ -30,14 +30,25 @@
   button:active { transform: scale(.95); filter: brightness(1.25); }
   .screen { display: none; flex-direction: column; flex: 1; min-height: 0; padding: 12px 16px; gap: 12px; }
   .screen.active { display: flex; }
+  #setup { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  #setup .primary { flex-shrink: 0; margin-top: 8px; }
   h1 { font-size: 22px; margin: 8px 0 0; text-align: center; letter-spacing: 2px; }
   .label { font-size: 13px; color: var(--muted); margin: 6px 0 4px; }
   .seg { display: flex; background: var(--panel); border-radius: var(--radius); padding: 4px; gap: 4px; }
   .seg button { flex: 1; padding: 12px 4px; background: transparent; border-radius: 10px; font-weight: 600; }
   .seg button.on { background: var(--accent); color: #111; }
-  .players-setup { display: flex; flex-direction: column; gap: 8px; }
-  .players-setup input { width: 100%; font: inherit; font-size: 17px; padding: 12px 14px; border-radius: var(--radius);
-    border: 0; background: var(--panel); color: var(--text); }
+  .slots { display: flex; gap: 8px; }
+  .slot { flex: 1; background: var(--panel); border-radius: var(--radius); padding: 8px 4px; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 2px dashed #3a4150; min-height: 76px; justify-content: center; }
+  .slot.has { border-style: solid; border-color: var(--accent); }
+  .slot .em { font-size: 34px; line-height: 1; }
+  .slot .nm { font-size: 12px; color: var(--muted); }
+  .slot.has .nm { color: var(--text); }
+  .zoo { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .zoo button { background: var(--panel); padding: 8px 2px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .zoo button .em { font-size: 32px; line-height: 1.1; }
+  .zoo button .nm { font-size: 11px; color: var(--muted); }
+  .zoo button.taken { opacity: .25; }
+  .primary[disabled] { opacity: .4; }
   .toggle { display: flex; align-items: center; justify-content: space-between; background: var(--panel); border-radius: var(--radius); padding: 12px 14px; }
   .sw { width: 50px; height: 30px; border-radius: 15px; background: #3a4150; position: relative; padding: 0; }
   .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: left .15s; }
@@ -51,7 +62,8 @@
   .scores.n3, .scores.n4 { grid-template-columns: 1fr 1fr; }
   .pc { background: var(--panel); border-radius: var(--radius); padding: 8px 12px; border: 2px solid transparent; display: flex; justify-content: space-between; align-items: center; min-height: 54px; }
   .pc.cur { border-color: var(--accent); background: #2a2415; }
-  .pc .nm { font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+  .pc .nm { font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
+  .pc .nm .em { font-size: 26px; vertical-align: middle; margin-right: 4px; }
   .pc.cur .nm { color: var(--accent); font-weight: 700; }
   .pc .sc { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; }
   .turn { display: flex; gap: 8px; align-items: center; background: var(--panel); border-radius: var(--radius); padding: 10px 12px; }
@@ -117,8 +129,9 @@
   <div class="seg" id="countSeg">
     <button data-v="2" class="on">2 人</button><button data-v="3">3 人</button><button data-v="4">4 人</button>
   </div>
-  <div class="label">玩家名稱</div>
-  <div class="players-setup" id="names"></div>
+  <div class="label">選擇你的動物（依序點選）</div>
+  <div class="slots" id="slots"></div>
+  <div class="zoo" id="zoo"></div>
   <div class="toggle" style="margin-top:6px">
     <div><div>Double Out</div><div class="label" style="margin:2px 0 0">最後一鏢必須是雙倍區或紅心</div></div>
     <button class="sw" id="doSw"></button>
@@ -174,7 +187,7 @@ const $ = s => document.querySelector(s);
 const LS = 'dartcalc.v1';
 
 // ---------- 狀態 ----------
-let settings = { start: 501, count: 2, names: ['玩家 1', '玩家 2', '玩家 3', '玩家 4'], doubleOut: false, mode: 'pad' };
+let settings = { start: 501, count: 2, animals: ['🐶', '🐱'], doubleOut: false, mode: 'pad' };
 let game = null; // { players:[{name,score}], cur, turnStart, darts:[{v,m,pts,label}], over }
 let mult = 1, pending = null;
 
@@ -193,21 +206,37 @@ function segInit(id, key, cb) {
   });
 }
 function segSet(id, v) { $(id).querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v == v)); }
+const ZOO = [['🐶','小狗'],['🐱','小貓'],['🐰','兔子'],['🦊','狐狸'],['🐻','棕熊'],['🐼','貓熊'],['🐨','無尾熊'],['🐯','老虎'],['🦁','獅子'],['🐮','乳牛'],
+  ['🐷','小豬'],['🐸','青蛙'],['🐵','猴子'],['🐔','公雞'],['🐧','企鵝'],['🦉','貓頭鷹'],['🐙','章魚'],['🦄','獨角獸'],['🐲','神龍'],['🦖','恐龍']];
+const zooName = em => (ZOO.find(z => z[0] === em) || ['', ''])[1];
 function renderNames() {
-  const box = $('#names'); box.innerHTML = '';
+  settings.animals = settings.animals.filter(a => zooName(a)).slice(0, settings.count);
+  const slots = $('#slots'); slots.innerHTML = '';
   for (let i = 0; i < settings.count; i++) {
-    const inp = document.createElement('input');
-    inp.placeholder = `玩家 ${i + 1}`; inp.value = settings.names[i] || ''; inp.maxLength = 10;
-    inp.addEventListener('input', () => { settings.names[i] = inp.value; save(); });
-    box.appendChild(inp);
+    const a = settings.animals[i], d = document.createElement('div');
+    d.className = 'slot' + (a ? ' has' : '');
+    d.innerHTML = a ? `<div class="em">${a}</div><div class="nm">${zooName(a)}</div>` : `<div class="em" style="color:#3a4150">?</div><div class="nm">玩家 ${i + 1}</div>`;
+    if (a) d.addEventListener('click', () => { settings.animals.splice(i, 1); click(); save(); renderNames(); });
+    slots.appendChild(d);
   }
+  const zoo = $('#zoo'); zoo.innerHTML = '';
+  ZOO.forEach(([em, nm]) => {
+    const b = document.createElement('button'); b.className = settings.animals.includes(em) ? 'taken' : '';
+    b.innerHTML = `<span class="em">${em}</span><span class="nm">${nm}</span>`;
+    b.addEventListener('click', () => {
+      if (settings.animals.includes(em) || settings.animals.length >= settings.count) return;
+      settings.animals.push(em); click(); save(); renderNames();
+    });
+    zoo.appendChild(b);
+  });
+  $('#startBtn').disabled = settings.animals.length < settings.count;
 }
 segInit('#startSeg', 'start', v => { settings.start = +v; save(); });
 segInit('#countSeg', 'count', v => { settings.count = +v; renderNames(); save(); });
 $('#doSw').addEventListener('click', () => { settings.doubleOut = !settings.doubleOut; $('#doSw').classList.toggle('on', settings.doubleOut); save(); });
 $('#startBtn').addEventListener('click', () => {
   game = {
-    players: Array.from({ length: settings.count }, (_, i) => ({ name: (settings.names[i] || '').trim() || `玩家 ${i + 1}`, score: settings.start })),
+    players: settings.animals.map(a => ({ em: a, name: zooName(a), score: settings.start })),
     cur: 0, turnStart: settings.start, darts: [], over: false
   };
   save(); showGame();
@@ -229,9 +258,9 @@ function render() {
   const sc = $('#scores'); sc.className = 'scores n' + g.players.length; sc.innerHTML = '';
   g.players.forEach((pl, i) => {
     const d = document.createElement('div'); d.className = 'pc' + (i === g.cur ? ' cur' : '');
-    d.innerHTML = `<span class="nm">${esc(pl.name)}</span><span class="sc">${pl.score}</span>`; sc.appendChild(d);
+    d.innerHTML = `<span class="nm"><span class="em">${pl.em || ""}</span>${esc(pl.name)}</span><span class="sc">${pl.score}</span>`; sc.appendChild(d);
   });
-  $('#whoName').textContent = p.name;
+  $('#whoName').textContent = `${p.em || ""} ${p.name}`;
   for (let i = 0; i < 3; i++) {
     const el = $('#d' + i), dt = g.darts[i];
     el.textContent = dt ? dt.label : '–'; el.classList.toggle('hit', !!dt);
@@ -438,7 +467,7 @@ function winFx(name) {
   fanfare(); navigator.vibrate && navigator.vibrate([100, 50, 100, 50, 300]);
   const colors = ['#ffb020', '#2ecc71', '#4ea1ff', '#ff3b3b', '#ffffff', '#ff6bd6'];
   for (let i = 0; i < 4; i++) setTimeout(() => spawn(120, colors, .12, 12, innerWidth * (0.2 + 0.6 * Math.random()), innerHeight * 0.35), i * 300);
-  bigText(`🏆 ${name}\n獲勝!`, 'win', 2200);
+  bigText(`${game.players.find(x => x.name === name).em} ${name}\n獲勝!`, 'win', 2200);
   setTimeout(() => { $('#mTitle').textContent = `${name} 獲勝！`; $('#mText').textContent = '剛好歸零，漂亮。'; $('#modal').classList.add('show'); }, 2200);
 }
 
