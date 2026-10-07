@@ -71,7 +71,9 @@
   .turn .who b { color: var(--accent); }
   .dart { width: 54px; height: 44px; border-radius: 10px; background: var(--panel2); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; color: var(--muted); }
   .dart.hit { background: #2d3a4f; color: #fff; }
-  .turn .sum { font-size: 14px; color: var(--muted); min-width: 44px; text-align: right; }
+  .turn .sum { font-size: 14px; color: var(--muted); min-width: 36px; text-align: right; }
+  .turn .undo { width: 44px; height: 44px; padding: 0; font-size: 22px; border-radius: 10px; background: #3a4150; }
+  .turn .undo[disabled] { opacity: .3; }
   .input { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
   .modeseg button { padding: 9px 4px; font-size: 14px; }
 
@@ -150,6 +152,7 @@
     <div class="who">輪到 <b id="whoName"></b></div>
     <div class="dart" id="d0">–</div><div class="dart" id="d1">–</div><div class="dart" id="d2">–</div>
     <div class="sum" id="turnSum"></div>
+    <button class="undo" id="undoBtn" disabled>↩</button>
   </div>
   <div class="input">
     <div class="seg modeseg" id="modeSeg">
@@ -189,7 +192,7 @@ const LS = 'dartcalc.v1';
 // ---------- 狀態 ----------
 let settings = { start: 501, count: 2, animals: ['🐶', '🐱'], doubleOut: false, mode: 'pad' };
 let game = null; // { players:[{name,score}], cur, turnStart, darts:[{v,m,pts,label}], over }
-let mult = 1, pending = null;
+let mult = 1, pending = null, timer = null;
 
 function save() { localStorage.setItem(LS, JSON.stringify({ settings, game })); }
 function load() {
@@ -237,7 +240,7 @@ $('#doSw').addEventListener('click', () => { settings.doubleOut = !settings.doub
 $('#startBtn').addEventListener('click', () => {
   game = {
     players: settings.animals.map(a => ({ em: a, name: zooName(a), score: settings.start })),
-    cur: 0, turnStart: settings.start, darts: [], over: false
+    cur: 0, turnStart: settings.start, darts: [], over: false, history: []
   };
   save(); showGame();
 });
@@ -267,6 +270,7 @@ function render() {
   }
   const sum = g.darts.reduce((a, d) => a + d.pts, 0);
   $('#turnSum').textContent = g.darts.length ? `-${sum}` : '';
+  $('#undoBtn').disabled = !g.history || !g.history.length;
   $('#mult').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.m === mult));
   renderPending();
 }
@@ -276,6 +280,8 @@ function esc(s) { return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 function throwDart(v, m) {
   if (!game || game.over) return;
   const pts = v * m;
+  game.history.push(JSON.stringify({ players: game.players.map(x => x.score), cur: game.cur, turnStart: game.turnStart, darts: game.darts, over: game.over }));
+  if (game.history.length > 60) game.history.shift();
   const label = v === 0 ? 'MISS' : v === 25 ? 'BULL' : (m === 3 ? 'T' : m === 2 ? 'D' : '') + v;
   const isDouble = m === 2; // D1..D20 或 BULL(50)
   game.darts.push({ v, m, pts, label });
@@ -287,11 +293,21 @@ function throwDart(v, m) {
   if (next < 0) bust = true;
   else if (settings.doubleOut && (next === 1 || (next === 0 && !isDouble))) bust = true;
 
-  if (bust) { p.score = game.turnStart; render(); save(); bustFx(p.name, pts); setTimeout(endTurn, 1500); return; }
+  if (bust) { p.score = game.turnStart; render(); save(); bustFx(p.name, pts); timer = setTimeout(endTurn, 1500); return; }
   p.score = next; render(); save();
   if (next === 0) { game.over = true; save(); winFx(p.name); return; }
-  if (game.darts.length === 3) setTimeout(endTurn, 500);
+  if (game.darts.length === 3) timer = setTimeout(endTurn, 500);
 }
+function undo() {
+  if (!game || !game.history.length) return;
+  clearTimeout(timer); timer = null;
+  const h = JSON.parse(game.history.pop());
+  h.players.forEach((sc, i) => game.players[i].score = sc);
+  game.cur = h.cur; game.turnStart = h.turnStart; game.darts = h.darts; game.over = false;
+  $('#modal').classList.remove('show'); $('#big').className = '';
+  mult = 1; pending = null; click(); render(); save();
+}
+$('#undoBtn').addEventListener('click', undo);
 function endTurn() {
   if (!game || game.over) return;
   game.cur = (game.cur + 1) % game.players.length;
@@ -388,7 +404,7 @@ $('#quitBtn').addEventListener('click', () => { if (confirm('確定要結束這�
 $('#mAgain').addEventListener('click', () => {
   $('#modal').classList.remove('show');
   game.players.forEach(p => p.score = settings.start);
-  game.cur = (game.cur + 1) % game.players.length; game.turnStart = settings.start; game.darts = []; game.over = false;
+  game.cur = (game.cur + 1) % game.players.length; game.turnStart = settings.start; game.darts = []; game.over = false; game.history = [];
   save(); render();
 });
 $('#mHome').addEventListener('click', () => { $('#modal').classList.remove('show'); game = null; save(); showSetup(); });
