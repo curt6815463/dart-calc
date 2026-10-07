@@ -82,7 +82,7 @@
   .mult button.on { background: var(--blue); color: #fff; }
   .nums { flex: 1; display: grid; grid-template-columns: repeat(5, 1fr); grid-auto-rows: 1fr; gap: 6px; min-height: 0; }
   .nums button { font-size: 21px; font-weight: 700; padding: 0; }
-  .nums .b25 { background: #1f4d2f; } .nums .b50 { background: #6b1e1e; } .nums .miss { background: #3a4150; color: var(--muted); font-size: 16px; }
+  .nums .b50 { background: #6b1e1e; font-size: 18px; } .nums .miss { background: #3a4150; color: var(--muted); font-size: 16px; }
 
   /* board */
   .boardwrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 0; }
@@ -276,7 +276,7 @@ function esc(s) { return s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 function throwDart(v, m) {
   if (!game || game.over) return;
   const pts = v * m;
-  const label = v === 0 ? 'MISS' : v === 25 ? (m === 2 ? 'BULL' : '25') : (m === 3 ? 'T' : m === 2 ? 'D' : '') + v;
+  const label = v === 0 ? 'MISS' : v === 25 ? 'BULL' : (m === 3 ? 'T' : m === 2 ? 'D' : '') + v;
   const isDouble = m === 2; // D1..D20 或 BULL(50)
   game.darts.push({ v, m, pts, label });
   const p = game.players[game.cur];
@@ -303,7 +303,7 @@ function endTurn() {
 (function buildPad() {
   const n = $('#nums');
   for (let i = 1; i <= 20; i++) { const b = document.createElement('button'); b.textContent = i; b.dataset.v = i; n.appendChild(b); }
-  n.insertAdjacentHTML('beforeend', '<button class="b25" data-v="25" data-m="1">25</button><button class="b50" data-v="25" data-m="2">BULL<br>50</button><button class="miss" data-v="0" data-m="1" style="grid-column: span 3">MISS 沒中</button>');
+  n.insertAdjacentHTML('beforeend', '<button class="b50" data-v="25" data-m="2" style="grid-column: span 2">BULL 紅心 50</button><button class="miss" data-v="0" data-m="1" style="grid-column: span 3">MISS 沒中</button>');
   n.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     const v = +b.dataset.v, m = b.dataset.m ? +b.dataset.m : mult;
@@ -350,8 +350,8 @@ function ringPath(r1, r2, a1, a2) {
     const idx = Math.floor(((ang + step / 2) % (Math.PI * 2)) / step), num = SECTORS[idx];
     const a1 = idx * step - step / 2, a2 = a1 + step;
     let v, m, d;
-    if (r <= R.bull) { v = 25; m = 2; d = circ(R.bull); }
-    else if (r <= R.b25) { v = 25; m = 1; d = ringPath(R.bull, R.b25, 0, Math.PI * 2 - 0.0001); }
+    if (r <= R.bull) { v = 25; m = 2; d = circ(R.b25); }
+    else if (r <= R.b25) { v = 25; m = 2; d = circ(R.b25); }
     else if (r <= R.tIn) { v = num; m = 1; d = ringPath(R.b25, R.tIn, a1, a2); }
     else if (r <= R.tOut) { v = num; m = 3; d = ringPath(R.tIn, R.tOut, a1, a2); }
     else if (r <= R.dIn) { v = num; m = 1; d = ringPath(R.tOut, R.dIn, a1, a2); }
@@ -366,7 +366,7 @@ function renderPending() {
   hl.setAttribute('d', pending ? pending.d : '');
   if (pending) {
     const { v, m } = pending, pts = v * m;
-    const name = v === 0 ? 'MISS 沒中' : v === 25 ? (m === 2 ? 'BULL 紅心' : '外紅心 25') : `${m === 3 ? '三倍 T' : m === 2 ? '雙倍 D' : '單倍 '}${v}`;
+    const name = v === 0 ? 'MISS 沒中' : v === 25 ? 'BULL 紅心' : `${m === 3 ? '三倍 T' : m === 2 ? '雙倍 D' : '單倍 '}${v}`;
     pend.textContent = `${name}  =  ${pts} 分`; pend.classList.add('has');
   } else { pend.textContent = '點選靶上位置'; pend.classList.remove('has'); }
   $('#okBtn').disabled = !pending; $('#cancelBtn').disabled = !pending;
